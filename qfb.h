@@ -60,7 +60,6 @@ int execute_cmd(Cmd* cmd) {
     cmd->capacity = 0;
 
     printf("[QFB] Executing %s\n", cmd_joined);
-    free(cmd_joined);
     int cpid = fork();
     if (cpid < 0) {
         printf("Could not fork child process: %s", strerror(errno));
@@ -74,6 +73,8 @@ int execute_cmd(Cmd* cmd) {
             printf("Could not exec child process for %s: %s", cmd->args[0], strerror(errno));
             exit(1);
         }
+        // I suppose we should also free args here since this
+        // is a different process.
     } else {
         // Code inside the parent process.
         free(cmd->args); // Not entirely sure if this leaks memory lol.
