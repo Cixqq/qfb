@@ -1,3 +1,4 @@
+#include <bits/wait.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -13,12 +14,16 @@ typedef struct {
     int count;
 } Cmd;
 
+#ifndef _QFB_GUARD
+    #define _QFB_GUARD
 void _cmd_append(Cmd* cmd, ...);
-int execute_cmd(Cmd* cmd); // Thread-safety NOT GUARANTEED.
+int execute_cmd(Cmd* cmd);       // Thread-safety NOT GUARANTEED.
+int execute_cmd_async(Cmd* cmd); // Thread-safety NOT GUARANTEED.
+#endif                           // _QFB_GUARD
 
 #define cmd_append(cmd, ...) _cmd_append(cmd, __VA_ARGS__, NULL)
 
-#ifdef QFB_IMPLEMENTATION
+#ifndef QFB_IMPLEMENTATION
 void _cmd_append(Cmd* cmd, ...) {
     va_list args;
     va_start(args, cmd);
@@ -46,12 +51,12 @@ void _cmd_append(Cmd* cmd, ...) {
     va_end(args);
 }
 
-int execute_cmd(Cmd* cmd) {
+pid_t execute_cmd_async(Cmd* cmd) {
     char* cmd_joined = (char*)malloc(cmd->size);
 
     for (int i = 0; i < cmd->count; ++i) {
         strcat(cmd_joined, cmd->args[i]);
-        strcat(cmd_joined, " ");
+        strcat(cmd_joined, i == cmd->count - 1 ? "" : " "); // Concatenate a space unless we're at the very end.
     }
 
     // Not needed anymore. We might as well just reset them here.
@@ -60,27 +65,30 @@ int execute_cmd(Cmd* cmd) {
     cmd->capacity = 0;
 
     printf("[QFB] Executing %s\n", cmd_joined);
-    int cpid = fork();
-    if (cpid < 0) {
-        printf("Could not fork child process: %s", strerror(errno));
-        return 1;
+    pid_t pid = fork();
+    if (pid < 0) {
+        printf("Could not fork child process: %s\n", strerror(errno));
+        return 0;
     }
 
-    int status = 1;
-    if (cpid == 0) {
+    if (pid == 0) {
         // Code inside the child process.
         if (execvp(cmd->args[0], (char* const*)cmd->args) < 0) {
-            printf("Could not exec child process for %s: %s", cmd->args[0], strerror(errno));
+            printf("Could not exec child process for %s: %s\n", cmd->args[0], strerror(errno));
             exit(1);
         }
-        // I suppose we should also free args here since this
-        // is a different process.
     } else {
         // Code inside the parent process.
-        free(cmd->args); // Not entirely sure if this leaks memory lol.
-        waitpid(cpid, &status, 0);
+        free(cmd->args);
     }
 
-    return status;
+    return pid;
+}
+
+int execute_cmd(Cmd* cmd) {
+    int status = 1;
+    pid_t pid = execute_cmd_async(cmd);
+    waitpid(pid, &status, 0);
+    return WEXITSTATUS(status);
 }
 #endif // QFB_IMPLEMENTATION

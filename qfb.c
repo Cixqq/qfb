@@ -1,9 +1,9 @@
-#define QFB_IMPLEMENTATION
+// #define QFB_IMPLEMENTATION
 #include "qfb.h"
 
 int main() {
     Cmd cmd = {0};
-    cmd_append(&cmd, "clang", "-Wall");
+    cmd_append(&cmd, "clang", "-Wall", "-ggdb");
     cmd_append(&cmd, "-o", "qfb");
     cmd_append(&cmd, "qfb.c");
 
