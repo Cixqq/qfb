@@ -1,13 +1,18 @@
-// #define QFB_IMPLEMENTATION
+#define QFB_IMPLEMENTATION
 #include "qfb.h"
 
-int main() {
-    Cmd cmd = {0};
-    cmd_append(&cmd, "clang", "-Wall", "-ggdb");
-    cmd_append(&cmd, "-o", "qfb");
-    cmd_append(&cmd, "qfb.c");
+int main(int argc, char** argv) {
+    // The line below automatically detects if theres
+    // any changes to this file and auto recompiles
+    // itself accordingly.
+    // qfb_self_rebuild(argv);
 
-    if (execute_cmd(&cmd) != 0) {
+    Qfb_Cmd cmd = {0};
+    qfb_cmd_append(&cmd, "clang", "-Wall", "-ggdb");
+    qfb_cmd_append(&cmd, "-o", "qfb");
+    qfb_cmd_append(&cmd, "qfb.c");
+
+    if (qfb_execute_cmd(&cmd) != 0) {
         printf("[QFB] Failed to build...\n");
         return 1;
     }

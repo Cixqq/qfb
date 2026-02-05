@@ -12,19 +12,19 @@ typedef struct {
     int size;
     int capacity;
     int count;
-} Cmd;
+} Qfb_Cmd;
 
 #ifndef _QFB_GUARD
     #define _QFB_GUARD
-void _cmd_append(Cmd* cmd, ...);
-int execute_cmd(Cmd* cmd);       // Thread-safety NOT GUARANTEED.
-int execute_cmd_async(Cmd* cmd); // Thread-safety NOT GUARANTEED.
-#endif                           // _QFB_GUARD
+void _qfb_cmd_append(Qfb_Cmd* cmd, ...);
+int qfb_execute_cmd(Qfb_Cmd* cmd);       // Thread-safety NOT GUARANTEED.
+int qfb_execute_cmd_async(Qfb_Cmd* cmd); // Thread-safety NOT GUARANTEED.
+void qfb_self_rebuild();
+    #define qfb_cmd_append(cmd, ...) _qfb_cmd_append(cmd, __VA_ARGS__, NULL)
+#endif // _QFB_GUARD
 
-#define cmd_append(cmd, ...) _cmd_append(cmd, __VA_ARGS__, NULL)
-
-#ifndef QFB_IMPLEMENTATION
-void _cmd_append(Cmd* cmd, ...) {
+#ifdef QFB_IMPLEMENTATION
+void _qfb_cmd_append(Qfb_Cmd* cmd, ...) {
     va_list args;
     va_start(args, cmd);
 
@@ -51,7 +51,7 @@ void _cmd_append(Cmd* cmd, ...) {
     va_end(args);
 }
 
-pid_t execute_cmd_async(Cmd* cmd) {
+pid_t qfb_execute_cmd_async(Qfb_Cmd* cmd) {
     char* cmd_joined = (char*)malloc(cmd->size);
 
     for (int i = 0; i < cmd->count; ++i) {
@@ -85,10 +85,100 @@ pid_t execute_cmd_async(Cmd* cmd) {
     return pid;
 }
 
-int execute_cmd(Cmd* cmd) {
+int qfb_execute_cmd(Qfb_Cmd* cmd) {
     int status = 1;
-    pid_t pid = execute_cmd_async(cmd);
+    pid_t pid = qfb_execute_cmd_async(cmd);
     waitpid(pid, &status, 0);
     return WEXITSTATUS(status);
 }
+
+unsigned int qfb_checksum(const char* source) {
+    FILE* fp = fopen(source, "rb");
+    unsigned int checksum = 0;
+    while (!feof(fp) && !ferror(fp)) {
+        checksum ^= fgetc(fp);
+    }
+    fclose(fp);
+    return checksum;
+}
+
+// Forgot where I copied this from lmao.
+int qfb_ltoa(long value, char* sp) {
+    char tmp[16]; // be careful with the length of the buffer
+    char* tp = tmp;
+    int i;
+    unsigned v;
+    int radix = 10;
+
+    int sign = (radix == 10 && value < 0);
+    if (sign)
+        v = -value;
+    else
+        v = (unsigned)value;
+
+    while (v || tp == tmp) {
+        i = v % radix;
+        v /= radix;
+        if (i < 10)
+            *tp++ = i + '0';
+        else
+            *tp++ = i + 'a' - 10;
+    }
+
+    int len = tp - tmp;
+
+    if (sign) {
+        *sp++ = '-';
+        len++;
+    }
+
+    while (tp > tmp)
+        *sp++ = *--tp;
+
+    return len;
+}
+
+    #ifndef CHECKSUM
+        #define CHECKSUM ""
+    #endif // CHECKSUM
+    #define CHECKSUM_BUF_SIZE 64
+// If the recipe file gets too big we might need to
+// switch from hardcoding sizes on the stack to a proper
+// dynamically sized string implementation which shouldn't
+// be that hard I suppose.
+
+// The core idea is that we check if an embedded checksum (`#define CHECKSUM`)
+// equals to the current checksum and if they don't we just recompile.
+void _qfb_self_rebuild(const char* dest, const char* source) {
+    unsigned int current_checksum = qfb_checksum(source);
+    char current_checksum_str[CHECKSUM_BUF_SIZE];
+    qfb_ltoa(current_checksum, current_checksum_str);
+
+    if (strcmp(CHECKSUM, "") == 0 || strcmp(current_checksum_str, CHECKSUM) != 0) {
+        Qfb_Cmd cmd;
+        char new_checksum[CHECKSUM_BUF_SIZE];
+        printf("[QFB] Detected a change! Self compiling and embedding checksum...\n");
+
+        sprintf(new_checksum, "-DCHECKSUM=\"%u\"", current_checksum);
+        // TODO: Add support for other compilers.
+        // For now we'll just use `cc` and hope it works well with clang and gcc.
+        qfb_cmd_append(&cmd, "cc", new_checksum, source, "-o", dest);
+        if (qfb_execute_cmd(&cmd) != 0) {
+            printf("[QFB] Failed to self build... Continuing...\n");
+            return;
+        }
+
+        qfb_cmd_append(&cmd, "./qfb");
+        if (execvp(cmd.args[0], (char* const*)cmd.args) < 0) {
+            printf("Could not exec child process for %s: %s\n", cmd.args[0], strerror(errno));
+            exit(1);
+        }
+    }
+}
+
+    #define qfb_self_rebuild(argv)                                                                                     \
+        do {                                                                                                           \
+            /* Who knows if we ever needed argc in the future... */                                                    \
+            _qfb_self_rebuild(argv[0], __FILE__);                                                                      \
+        } while (0)
 #endif // QFB_IMPLEMENTATION
