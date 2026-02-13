@@ -7,10 +7,13 @@ Build an entire C/C++ project using just C.
 #include "qfb.h"
 
 int main() {
-    Cmd cmd = {0};
-    cmd_append(&cmd, "clang", "-Wall", "main.c", "-o", "main");
+    // Checksum-based self-rebuilding function.
+    qfb_self_rebuild();
 
-    if (execute_cmd(&cmd) != 0) {
+    Qfb_Cmd cmd = {0};
+    qfb_cmd_append(&cmd, "clang", "-Wall", "main.c", "-o", "main");
+
+    if (qfb_execute_cmd(&cmd) != 0) {
         printf("[QFB] Failed to build...\n");
         return 1;
     }
