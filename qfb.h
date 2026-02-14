@@ -52,7 +52,7 @@ void _qfb_cmd_append(Qfb_Cmd* cmd, ...) {
             break;
         if (cmd->size + sizeof(arg) >= cmd->capacity) {
             cmd->capacity *= 2;
-            cmd->args = (char**)realloc(cmd, cmd->capacity);
+            cmd->args = (char**)realloc(cmd->args, cmd->capacity);
         }
         cmd->args[i] = arg;
         cmd->size += sizeof(arg);
@@ -63,7 +63,7 @@ void _qfb_cmd_append(Qfb_Cmd* cmd, ...) {
 }
 
 pid_t qfb_execute_cmd_async(Qfb_Cmd* cmd) {
-    char* cmd_joined = (char*)malloc(cmd->size);
+    char* cmd_joined = (char*)calloc(1, cmd->size);
 
     for (int i = 0; i < cmd->count; ++i) {
         strcat(cmd_joined, cmd->args[i]);
@@ -76,6 +76,7 @@ pid_t qfb_execute_cmd_async(Qfb_Cmd* cmd) {
     cmd->capacity = 0;
 
     printf("[QFB] Executing %s\n", cmd_joined);
+    free(cmd_joined);
     pid_t pid = fork();
     if (pid < 0) {
         printf("Could not fork child process: %s\n", strerror(errno));
