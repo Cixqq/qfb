@@ -8,7 +8,9 @@ Build an entire C/C++ project using just C.
 
 int main() {
     // Checksum-based self-rebuilding function.
-    qfb_self_rebuild();
+    qfb_self_rebuild_checksum();
+    // Alternatively a time-based self-rebuilding function can be used.
+    // qfb_self_rebuild_time();
 
     Qfb_Cmd cmd = {0};
     qfb_cmd_append(&cmd, "clang", "-Wall", "main.c", "-o", "main");

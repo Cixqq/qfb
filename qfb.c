@@ -5,7 +5,7 @@ int main(int argc, char** argv) {
     // This function automatically detects if theres
     // any changes to this file and auto recompiles
     // itself accordingly using a checksum-based method.
-    // qfb_self_rebuild(argv);
+    // qfb_self_rebuild_checksum(argv);
 
     // This function also detects changes to this file
     // and auto recompile automatically but it's time-based.
