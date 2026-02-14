@@ -2,10 +2,14 @@
 #include "qfb.h"
 
 int main(int argc, char** argv) {
-    // The line below automatically detects if theres
+    // This function automatically detects if theres
     // any changes to this file and auto recompiles
-    // itself accordingly.
+    // itself accordingly using a checksum-based method.
     // qfb_self_rebuild(argv);
+
+    // This function also detects changes to this file
+    // and auto recompile automatically but it's time-based.
+    // qfb_self_rebuild_time(argv);
 
     Qfb_Cmd cmd = {0};
     qfb_cmd_append(&cmd, "clang", "-Wall", "-ggdb");
