@@ -200,7 +200,8 @@ void _qfb_self_rebuild_time(const char* dest, const char* source) {
     struct stat sb_dest;
     struct stat sb_src;
     if (lstat(dest, &sb_dest) == -1 || lstat(source, &sb_src) == -1) {
-        printf("[QFB] Couldn't get the required metadata for rebuilding.\n");
+        printf("[QFB] Couldn't get the required metadata for rebuilding. Continuing...\n");
+        return;
     }
     if (sb_dest.st_mtime < sb_src.st_mtime) {
         _qfb_self_rebuild(source, dest, 0, "");
