@@ -19,7 +19,7 @@ typedef struct {
 void _qfb_cmd_append(Qfb_Cmd* cmd, ...);
 int qfb_execute_cmd(Qfb_Cmd* cmd);       // Thread-safety NOT GUARANTEED.
 int qfb_execute_cmd_async(Qfb_Cmd* cmd); // Thread-safety NOT GUARANTEED.
-void qfb_self_rebuild();
+void qfb_self_rebuild(void);
     #define qfb_cmd_append(cmd, ...) _qfb_cmd_append(cmd, __VA_ARGS__, NULL)
     #define qfb_self_rebuild_checksum(argv)                                                                            \
         do {                                                                                                           \
@@ -47,9 +47,10 @@ void _qfb_cmd_append(Qfb_Cmd* cmd, ...) {
 
     for (int i = cmd->count;; ++i) {
         char* arg = va_arg(args, char*);
-        if (arg == NULL)
+        // TODO: Trim whitespaces.
+        if (arg == NULL || *arg == ' ')
             break;
-        if (cmd->size + sizeof(arg) >= cmd->capacity) {
+        if (cmd->size + strlen(arg) >= cmd->capacity) {
             cmd->capacity *= 2;
             cmd->args = (char**)realloc(cmd->args, cmd->capacity);
         }
@@ -78,14 +79,14 @@ pid_t qfb_execute_cmd_async(Qfb_Cmd* cmd) {
     free(cmd_joined);
     pid_t pid = fork();
     if (pid < 0) {
-        printf("Could not fork child process: %s\n", strerror(errno));
+        printf("[QFB] Could not fork child process: %s\n", strerror(errno));
         return 0;
     }
 
     if (pid == 0) {
         // Code inside the child process.
         if (execvp(cmd->args[0], (char* const*)cmd->args) < 0) {
-            printf("Could not exec child process for %s: %s\n", cmd->args[0], strerror(errno));
+            printf("[QFB] Could not exec child process for %s: %s\n", cmd->args[0], strerror(errno));
             exit(1);
         }
     } else {
@@ -117,15 +118,15 @@ unsigned int qfb_checksum(const char* source) {
     return checksum;
 }
 
-void _qfb_self_rebuild(const char* source, const char* dest, int isChecksumBased, const char* checksum) {
+void _qfb_self_rebuild(const char* source, const char* dest, char* flags) {
     Qfb_Cmd cmd = {0};
     printf("[QFB] Detected a change!\n");
 
     // TODO: Add support for other compilers.
     // For now we'll just use `cc` and hope it works well with clang and gcc.
     qfb_cmd_append(&cmd, "cc", source, "-o", dest);
-    if (isChecksumBased)
-        qfb_cmd_append(&cmd, checksum);
+    if (flags)
+        qfb_cmd_append(&cmd, flags);
 
     if (qfb_execute_cmd(&cmd) != 0) {
         printf("[QFB] Failed to self build... Continuing...\n");
@@ -134,7 +135,7 @@ void _qfb_self_rebuild(const char* source, const char* dest, int isChecksumBased
 
     qfb_cmd_append(&cmd, "./qfb");
     if (execvp(cmd.args[0], (char* const*)cmd.args) < 0) {
-        printf("Could not exec child process for %s: %s\n", cmd.args[0], strerror(errno));
+        printf("[QFB] Could not exec child process for %s: %s\n", cmd.args[0], strerror(errno));
         exit(1);
     }
 }
@@ -159,7 +160,7 @@ void _qfb_self_rebuild_checksum(const char* dest, const char* source) {
         }
         char new_checksum[CHECKSUM_BUF_SIZE];
         sprintf(new_checksum, "-DCHECKSUM=%u", current_checksum);
-        _qfb_self_rebuild(source, dest, 1, new_checksum);
+        _qfb_self_rebuild(source, dest, new_checksum);
     }
 }
 
@@ -173,7 +174,7 @@ void _qfb_self_rebuild_time(const char* dest, const char* source) {
         return;
     }
     if (sb_dest.st_mtime < sb_src.st_mtime) {
-        _qfb_self_rebuild(source, dest, 0, "");
+        _qfb_self_rebuild(source, dest, NULL);
     }
 }
 #endif // QFB_IMPLEMENTATION

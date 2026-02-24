@@ -9,10 +9,11 @@ int main(int argc, char** argv) {
 
     // This function also detects changes to this file
     // and auto recompile automatically but it's time-based.
-    // qfb_self_rebuild_time(argv);
+    qfb_self_rebuild_time(argv);
 
     Qfb_Cmd cmd = {0};
     qfb_cmd_append(&cmd, "clang", "-Wall", "-ggdb");
+    qfb_cmd_append(&cmd, "-pedantic");
     qfb_cmd_append(&cmd, "-o", "qfb");
     qfb_cmd_append(&cmd, "qfb.c");
 
