@@ -1,4 +1,3 @@
-#include <bits/wait.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -106,48 +105,16 @@ int qfb_execute_cmd(Qfb_Cmd* cmd) {
 
 unsigned int qfb_checksum(const char* source) {
     FILE* fp = fopen(source, "rb");
+    if (!fp) {
+        printf("[QFB] Couldn't open %s.\n", source);
+        return 0;
+    }
     unsigned int checksum = 0;
     while (!feof(fp) && !ferror(fp)) {
         checksum ^= fgetc(fp);
     }
     fclose(fp);
     return checksum;
-}
-
-// Forgot where I copied this from lmao.
-int qfb_ltoa(long value, char* sp) {
-    char tmp[16]; // be careful with the length of the buffer
-    char* tp = tmp;
-    int i;
-    unsigned v;
-    int radix = 10;
-
-    int sign = (radix == 10 && value < 0);
-    if (sign)
-        v = -value;
-    else
-        v = (unsigned)value;
-
-    while (v || tp == tmp) {
-        i = v % radix;
-        v /= radix;
-        if (i < 10)
-            *tp++ = i + '0';
-        else
-            *tp++ = i + 'a' - 10;
-    }
-
-    int len = tp - tmp;
-
-    if (sign) {
-        *sp++ = '-';
-        len++;
-    }
-
-    while (tp > tmp)
-        *sp++ = *--tp;
-
-    return len;
 }
 
 void _qfb_self_rebuild(const char* source, const char* dest, int isChecksumBased, const char* checksum) {
@@ -179,17 +146,19 @@ void _qfb_self_rebuild(const char* source, const char* dest, int isChecksumBased
 // The core idea is that we check if an embedded checksum (`#define CHECKSUM`)
 // equals to the current checksum and if they don't we just recompile.
     #ifndef CHECKSUM
-        #define CHECKSUM ""
+        #define CHECKSUM 0
     #endif // CHECKSUM
     #define CHECKSUM_BUF_SIZE 64
 void _qfb_self_rebuild_checksum(const char* dest, const char* source) {
     unsigned int current_checksum = qfb_checksum(source);
-    char current_checksum_str[CHECKSUM_BUF_SIZE];
-    qfb_ltoa(current_checksum, current_checksum_str);
 
-    if (strcmp(CHECKSUM, "") == 0 || strcmp(current_checksum_str, CHECKSUM) != 0) {
+    if (CHECKSUM == 0 || current_checksum != CHECKSUM) {
+        if (current_checksum == 0) {
+            printf("[QFB] Couldn't generate a hash for the checksum... Continuing.\n");
+            return;
+        }
         char new_checksum[CHECKSUM_BUF_SIZE];
-        sprintf(new_checksum, "-DCHECKSUM=\"%u\"", current_checksum);
+        sprintf(new_checksum, "-DCHECKSUM=%u", current_checksum);
         _qfb_self_rebuild(source, dest, 1, new_checksum);
     }
 }
